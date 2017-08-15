@@ -1,18 +1,28 @@
 package com.example.joane14.bootcamplocator;
 
+import android.content.Context;
 import android.graphics.BitmapFactory;
+import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
@@ -21,149 +31,126 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Created by Joane14 on 14/08/2017.
  */
 
-public class MapFragment extends SupportMapFragment implements GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener,
-        GoogleMap.OnInfoWindowClickListener,
-        GoogleMap.OnMapLongClickListener,
-        GoogleMap.OnMapClickListener,
-        GoogleMap.OnMarkerClickListener {
+public class MapFragment extends Fragment implements OnMapReadyCallback {
+
+    GoogleMap mGoogleMap;
+    private MarkerOptions userMarker;
+    private String zip;
+    private LocationList locationsListFragments;
 
 
-    private GoogleApiClient mGoogleApiClient;
-    private Location mCurrentLocation;
-
-    private final int MAP_TYPES = GoogleMap.MAP_TYPE_NORMAL;
-    private int curMapTypeIndex = 0;
-
-    @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        setHasOptionsMenu(true);
-
-        mGoogleApiClient = new GoogleApiClient.Builder( getActivity() )
-                .addConnectionCallbacks( this )
-                .addOnConnectionFailedListener( this )
-                .addApi( LocationServices.API )
-                .build();
-
-        initListeners();
+    public MapFragment() {
     }
 
-    private void initListeners() {
-        getMap().setOnMarkerClickListener(this);
-        getMap().setOnMapLongClickListener(this);
-        getMap().setOnInfoWindowClickListener( this );
-        getMap().setOnMapClickListener(this);
+    public static MapFragment newInstance() {
+        MapFragment fragment = new MapFragment();
+        return fragment;
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
-        mGoogleApiClient.connect();
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
     }
 
     @Override
-    public void onStop() {
-        super.onStop();
-        if( mGoogleApiClient != null && mGoogleApiClient.isConnected() ) {
-            mGoogleApiClient.disconnect();
-        }
-    }
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        View v = inflater.inflate(R.layout.fragment_map, container, false);
+        //loading the map...
+        SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
+        mapFragment.getMapAsync(this);
 
-    @Override
-    public void onConnected(Bundle bundle) {
-        mCurrentLocation = LocationServices
-                .FusedLocationApi
-                .getLastLocation( mGoogleApiClient );
 
-        if(mCurrentLocation!=null){
-            initCamera(mCurrentLocation);
-            Log.d("inside", "mCurrentLocation");
-        }else {
-            Toast.makeText(getContext(), "Turn on Location.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void initCamera( Location location ) {
-        CameraPosition position = CameraPosition.builder()
-                .target( new LatLng( location.getLatitude(),
-                        location.getLongitude() ) )
-                .zoom( 16f )
-                .bearing( 0.0f )
-                .tilt( 0.0f )
-                .build();
-
-        getMap().animateCamera( CameraUpdateFactory
-                .newCameraPosition( position ), null );
-
-        getMap().setMapType( MAP_TYPES );
-        getMap().setTrafficEnabled( true );
-        getMap().setMyLocationEnabled( true );
-        getMap().getUiSettings().setZoomControlsEnabled( true );
-    }
-
-    @Override
-    public void onMapClick(LatLng latLng) {
-
-        MarkerOptions options = new MarkerOptions().position( latLng );
-        options.title( getAddressFromLatLng( latLng ) );
-
-        options.icon( BitmapDescriptorFactory.defaultMarker() );
-        getMap().addMarker( options );
-    }
-
-    @Override
-    public void onMapLongClick(LatLng latLng) {
-        MarkerOptions options = new MarkerOptions().position( latLng );
-        options.title( getAddressFromLatLng( latLng ) );
-
-        options.icon( BitmapDescriptorFactory.fromBitmap(
-                BitmapFactory.decodeResource( getResources(),
-                        R.mipmap.ic_launcher ) ) );
-
-        getMap().addMarker( options );
-    }
-
-    private String getAddressFromLatLng( LatLng latLng ) {
-        Geocoder geocoder = new Geocoder( getActivity() );
-
-        String address = "";
-        try {
-            address = geocoder
-                    .getFromLocation( latLng.latitude, latLng.longitude, 1 )
-                    .get( 0 ).getAddressLine( 0 );
-        } catch (IOException e ) {
+        locationsListFragments =  (LocationList) getActivity()
+                .getSupportFragmentManager()
+                .findFragmentById(R.id.container_location_list);
+        if(locationsListFragments == null){
+            locationsListFragments = LocationList.newInstance();
+            getActivity().
+                    getSupportFragmentManager().
+                    beginTransaction().
+                    add(R.id.container_location_list, locationsListFragments).
+                    commit();
         }
 
-        return address;
+        final EditText zipText = (EditText) v.findViewById(R.id.zip_text);
+        zipText.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                //Looking for input on the searchbar and checking when enter is pressed...
+                if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)){
+                    //perform action on key pressed...
+                    zip = zipText.getText().toString();
+                    Toast.makeText(getContext(), zip, Toast.LENGTH_SHORT).show();
+                    //Dismiss the keyboard
+                    InputMethodManager imm = (InputMethodManager)getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(zipText.getWindowToken(), 0);
+                    updateMapForZip(zip);
+                    showList();
+                    return true;
+                }
+                return false;
+            }
+        });
+        //Show the locations recycler view/list to the user when the user enters a zip...
+        hideList();
+        return v;
+
     }
 
     @Override
-    public boolean onMarkerClick(Marker marker) {
-        marker.showInfoWindow();
-        return true;
-    }
-
-
-    @Override
-    public void onConnectionSuspended(int i) {
+    public void onMapReady(GoogleMap googleMap) {
+        mGoogleMap = googleMap;
 
     }
 
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
+    public void setUserMarkers(LatLng latLng) {
+        if (userMarker == null) {
+            userMarker = new MarkerOptions().position(latLng).title("Current Location");
+            mGoogleMap.addMarker(userMarker);
+            Log.v("Hey", "Current Location");
+        }
+        //geocoding to find zip of current users location retrieved from the phone...
+
+        mGoogleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16));
+
+        mGoogleMap.setTrafficEnabled( true );
 
     }
 
-    @Override
-    public void onInfoWindowClick(Marker marker) {
 
+    private void updateMapForZip(String zip_code){
+
+        Toast.makeText(getContext(), zip_code, Toast.LENGTH_SHORT).show();
+        ArrayList<LocationObject> locations = DataService.getInstance().getNearBootCampLocations(Integer.parseInt(zip_code));
+
+        for (int x = 0; x < locations.size(); x++){
+            LocationObject loc = locations.get(x);
+            MarkerOptions marker = new MarkerOptions().position(new LatLng(loc.getLatitude(), loc.getLongitude()));
+            marker.title(loc.getLocationTittle());
+            marker.snippet(loc.getLocationAddress());
+            marker.icon(BitmapDescriptorFactory.fromResource(R.drawable.map_pin));
+            mGoogleMap.addMarker(marker);
+        }
+
+    }
+
+    //Hide location list fragment function ...
+    private void hideList(){
+        getActivity().getSupportFragmentManager().beginTransaction().hide(locationsListFragments).commit();
+    }
+
+    //Show location list fragment function ...
+    private void showList(){
+        getActivity().getSupportFragmentManager().beginTransaction().show(locationsListFragments).commit();
     }
 
 }
