@@ -23,14 +23,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener {
 
-    GoogleMap mGoogleMap;
-    SupportMapFragment mapFrag;
     LocationRequest mLocationRequest;
     GoogleApiClient mGoogleApiClient;
     Location mLastLocation;
     Marker mCurrLocationMarker;
-    private MapFragment mainFragment;
-    public String zip = "";
+    private MapFragment mapFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,11 +42,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 .build();
 
 
-        mainFragment = (MapFragment) getSupportFragmentManager().findFragmentById(R.id.container_main);
-        if (mainFragment == null)
+        mapFragment = (MapFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (mapFragment == null)
         {
-            mainFragment = MapFragment.newInstance();
-            getSupportFragmentManager().beginTransaction().add(R.id.container_main, mainFragment).commit();
+            mapFragment = MapFragment.newInstance();
+            getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, mapFragment).commit();
 
         }
         // mapFrag = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
@@ -111,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         markerOptions.title("Current Location");
         markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
         // mCurrLocationMarker = mGoogleMap.addMarker(markerOptions);
-        mainFragment.setUserMarkers(new LatLng(location.getLatitude(), location.getLongitude()));
+        mapFragment.setUserMarkers(new LatLng(location.getLatitude(), location.getLongitude()));
 
 
 
